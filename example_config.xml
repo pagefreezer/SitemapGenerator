@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site base_url="http://www.example.com/" store_into="./sitemap.xml" verbose="1" default_encoding="ISO-8859-1" suppress_search_engine_notify="1">
+  <accesslog path="./access-logs/*.txt" encoding="UTF-8" />
+
+  <filter action="drop" type="wildcard" pattern="//*" />
+  <filter action="drop" type="wildcard" pattern="/;*" />
+  <filter action="drop" type="wildcard" pattern="/.*" />
+
+  <filter action="drop" type="wildcard" pattern="*/searchresults.jsp*" />
+  <filter action="drop" type="wildcard" pattern="*/reaction.jsp*" />
+
+  <filter action="drop" type="wildcard" pattern="*/webeditor/*" />
+  <filter action="drop" type="wildcard" pattern="*/dhtmltree/*" />
+
+  <filter action="drop" type="wildcard" pattern="*.gif" />
+  <filter action="drop" type="wildcard" pattern="*.jpg" />
+  <filter action="drop" type="wildcard" pattern="*.png" />
+
+  <filter action="drop" type="wildcard" pattern="*.gif[?]*" />
+  <filter action="drop" type="wildcard" pattern="*.jpg[?]*" />
+  <filter action="drop" type="wildcard" pattern="*.png[?]*" />
+</site>

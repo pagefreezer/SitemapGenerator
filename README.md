@@ -1,6 +1,11 @@
 SitemapGenerator
 ================
 
+### Background
+
+SitemapGenerator was built on Googles Sitemap Gen (http://goog-sitemapgen.sourceforge.net/) provided under the terms of the BSD license.
+This version contains some enhencements, better documentation and examples.
+
 ### HOW TO RUN
 
 Required python version 2.2 or later.

@@ -1,4 +1,4 @@
-SitemapGenerator
+Sitemap Generator
 ================
 
 ### BACKGROUND

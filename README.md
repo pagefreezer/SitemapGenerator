@@ -140,4 +140,3 @@ Run by using this command:
     /path/to/lorem.gif
     /path/to/etc.gif
 ```
-

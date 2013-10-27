@@ -3,8 +3,9 @@ Sitemap Generator
 
 ### BACKGROUND
 
-SitemapGenerator was built on Google's Sitemap Gen (http://goog-sitemapgen.sourceforge.net/) provided under the terms of the BSD license.
-This version contains some enhencements, better documentation and examples.
+SitemapGenerator is a python script that generates sitemap.xml files from webserver access logs.
+It was built on Google's Sitemap Gen (http://goog-sitemapgen.sourceforge.net/) provided under the terms of the BSD license.
+This version contains some enhancements, better documentation and examples.
 
 ### HOW TO RUN
 

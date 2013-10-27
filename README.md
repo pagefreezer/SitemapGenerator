@@ -3,7 +3,7 @@ SitemapGenerator
 
 ### BACKGROUND
 
-SitemapGenerator was built on Googles Sitemap Gen (http://goog-sitemapgen.sourceforge.net/) provided under the terms of the BSD license.
+SitemapGenerator was built on Google's Sitemap Gen (http://goog-sitemapgen.sourceforge.net/) provided under the terms of the BSD license.
 This version contains some enhencements, better documentation and examples.
 
 ### HOW TO RUN

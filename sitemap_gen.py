@@ -25,6 +25,7 @@ import gzip
 import md5
 import os
 import re
+import imp
 import stat
 import time
 import types
@@ -1057,10 +1058,13 @@ class InputAccessLog:#1
             return
 
         # PATCH BEGIN
-        try:
-            from sitemap_gen_custom import line_rewrite
-        except ImportError:
-            line_rewrite = lambda x: x
+        if not "line_rewrite" in globals():
+            try:
+                from sitemap_gen_custom import line_rewrite
+            except ImportError:
+                line_rewrite = lambda x: x
+        else:
+            line_rewrite = globals()["line_rewrite"]
         # PATCH END
 
         # Iterate lines
@@ -2156,6 +2160,9 @@ if __name__ == '__main__':#1
     if not flags or not flags.has_key('config') or flags.has_key('help'):
         output.Log(__usage__, 0)
     else:
+        if "rewriter" in flags:
+            line_rewrite = imp.load_source("", "%s.py" % os.path.abspath(flags["rewriter"])).line_rewrite
+
         suppress_notify = flags.has_key('testing')
         sitemap = CreateSitemapFromFile(flags['config'], suppress_notify)
         if not sitemap:

@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 
-__usage__ = \
-"""A simple script to automatically produce sitemaps for a webserver,
+__usage__ = """
+A simple script to automatically produce sitemaps for a webserver,
 in the Google Sitemap Protocol (GSP).
 
 Usage: python sitemap_gen.py --config=config.xml [--help] [--testing]
             --config=config.xml, specifies config file location
             --help, displays usage message
             --testing, specified when user is experimenting
-"""
+""".lstrip()
 
-# Please be careful that all syntax used in this file can be parsed on
-# Python 1.5 -- this version check is not evaluated until after the
-# entire file has been parsed.
 import sys
 if sys.hexversion < 0x02020000:
     print 'This script requires Python 2.2 or later.'
@@ -35,9 +32,9 @@ import xml.sax
 
 # CONSTANTS:#1
 # Text encodings
-ENC_ASCII = 'ASCII'
-ENC_UTF8  = 'UTF-8'
-ENC_IDNA  = 'IDNA'
+ENC_ASCII = "ASCII"
+ENC_UTF8  = "UTF-8"
+ENC_IDNA  = "IDNA"
 ENC_ASCII_LIST = ['ASCII', 'US-ASCII', 'US', 'IBM367', 'CP367', 'ISO646-US'
                   'ISO_646.IRV:1991', 'ISO-IR-6', 'ANSI_X3.4-1968',
                   'ANSI_X3.4-1986', 'CPASCII' ]
@@ -50,7 +47,7 @@ MAXURLS_PER_SITEMAP = 50000
 SITEINDEX_SUFFIX = '_index.xml'
 
 # Regular expressions tried for extracting URLs from access logs.
-ACCESSLOG_CLF_PATTERN = re.compile(r'.+\s+"([^\s]+)\s+([^\s]+)\s+HTTP/\d+\.\d+"\s+200\s+.*')
+ACCESSLOG_CLF_PATTERN = re.compile(r'.+\s+"([^\s]+)\s+([^\s]+)\s+HTTP/\d+\.\d+"\s+200\s+(\d+).*')
 
 # Match patterns for lastmod attributes
 LASTMOD_PATTERNS = map(re.compile, [
@@ -582,7 +579,7 @@ class URL(object):#1
 
         for attribute in self.__slots__:
             # PATCH BEGIN
-            if attribute == "priority":
+            if not attribute in ["loc", "lastmod", "changefreq", "lastmod"]:
                 continue
             # PATCH END
             value = getattr(self, attribute)
@@ -952,6 +949,7 @@ class InputAccessLog:#1
         self._elf_uri      = -1                 # ELF field: '/foo?bar=1'
         self._elf_urifrag1 = -1                 # ELF field: '/foo'
         self._elf_urifrag2 = -1                 # ELF field: 'bar=1'
+        self._elf_bytes    = -1                 # ELF field: response bytes
 
         if not ValidateAttributes('ACCESSLOG', attributes, ('path', 'encoding')):
             return
@@ -986,6 +984,8 @@ class InputAccessLog:#1
                 self._elf_urifrag1 = i
             elif field == 'cs-uri-query':
                 self._elf_urifrag2 = i
+            elif field == "sc-bytes":
+                self._elf_bytes = i
         output.Log('Recognized an Extended Log File Format file.', 2)
         return True
 
@@ -994,32 +994,38 @@ class InputAccessLog:#1
         fields = line.split(' ')
         count  = len(fields)
 
+        size = 0
+
         # Verify status was Ok
         if self._elf_status >= 0:
             if self._elf_status >= count:
-                return None
+                return (None, size)
             if not fields[self._elf_status].strip() == '200':
-                return None
+                return (None, size)
 
         # Verify method was HEAD or GET
         if self._elf_method >= 0:
             if self._elf_method >= count:
-                return None
+                return (None, size)
             if not fields[self._elf_method].strip() in ('HEAD', 'GET'):
-                return None
+                return (None, size)
+
+        # Get "sc-bytes" as possible
+        if self._elf_bytes >= 0:
+            size = fields[self._elf_bytes].strip()
 
         # Pull the full URL if we can
         if self._elf_uri >= 0:
             if self._elf_uri >= count:
-                return None
+                return (None, size)
             url = fields[self._elf_uri].strip()
             if url != '-':
-                return url
+                return (url, size)
 
         # Put together a fragmentary URL
         if self._elf_urifrag1 >= 0:
             if self._elf_urifrag1 >= count or self._elf_urifrag2 >= count:
-                return None
+                return (url, size)
             urlfrag1 = fields[self._elf_urifrag1].strip()
             urlfrag2 = None
             if self._elf_urifrag2 >= 0:
@@ -1027,9 +1033,9 @@ class InputAccessLog:#1
             if urlfrag1 and (urlfrag1 != '-'):
                 if urlfrag2 and (urlfrag2 != '-'):
                     urlfrag1 = urlfrag1 + '?' + urlfrag2
-                return urlfrag1
+                return (urlfrag1, size)
 
-        return None
+        return (None, size)
 
     def RecognizeCLFLine(self, line):
         """ Try to tokenize a logfile line according to CLF pattern and see if
@@ -1046,8 +1052,8 @@ class InputAccessLog:#1
         if match:
             request = match.group(1)
             if request in ('HEAD', 'GET'):
-                return match.group(2)
-        return None
+                return (match.group(2), match.group(3))
+        return (None, 0)
 
     def ProduceURLs(self, consumer):
         """ Produces URLs from our data source, hands them in to the consumer. """
@@ -1086,15 +1092,16 @@ class InputAccessLog:#1
             # Digest the line
             match = None
             if self._is_elf:
-                match = self.GetELFLine(line)
+                match, size = self.GetELFLine(line)
             elif self._is_clf:
-                match = self.GetCLFLine(line)
+                match, size = self.GetCLFLine(line)
             if not match:
                 continue
 
             # Pass it on
             url = URL()
             url.TrySetAttribute('loc', match)
+            # TODO url.TrySetAttribute("size", match)
             consumer(url, True)
 
         file.close()
@@ -1677,7 +1684,8 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
         self._base_url     = None                # Prefix to all valid URLs
         self._store_into   = None                # Output filepath
         self._suppress     = suppress_notify     # Suppress notify of servers
-    #end def __init__
+
+        # TODO self._last_size    = {}                  # URL => last size
 
     def ValidateBasicConfig(self):
         """ Verifies (and cleans up) the basic user-configurable options. """

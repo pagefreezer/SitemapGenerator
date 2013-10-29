@@ -23,12 +23,14 @@ import md5
 import os
 import re
 import imp
+import json
 import stat
 import time
 import types
 import urllib
 import urlparse
 import xml.sax
+import datetime
 
 # CONSTANTS:#1
 # Text encodings
@@ -383,7 +385,7 @@ output = Output()
 class URL(object):#1
     """ URL is a smart structure grouping together the properties we
     care about for a single web reference. """
-    __slots__ = 'loc', 'lastmod', 'changefreq', 'priority'
+    __slots__ = 'loc', 'lastmod', 'changefreq', 'priority', "size"
 
     def __init__(self):
         self.loc        = None                  # URL -- in Narrow characters
@@ -1101,7 +1103,7 @@ class InputAccessLog:#1
             # Pass it on
             url = URL()
             url.TrySetAttribute('loc', match)
-            # TODO url.TrySetAttribute("size", match)
+            url.TrySetAttribute("size", size)
             consumer(url, True)
 
         file.close()
@@ -1685,7 +1687,7 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
         self._store_into   = None                # Output filepath
         self._suppress     = suppress_notify     # Suppress notify of servers
 
-        # TODO self._last_size    = {}                  # URL => last size
+        self._lastmod_dict = None
 
     def ValidateBasicConfig(self):
         """ Verifies (and cleans up) the basic user-configurable options. """
@@ -1711,9 +1713,13 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
         # Load store_into into a generator
         if all_good:
             if self._store_into:
-                self._filegen = FilePathGenerator()
-                if not self._filegen.Preload(self._store_into):
+                if not self._store_into.endswith(".xml"):
+                    output.Error("store_into attribute must be end with .xml")
                     all_good = False
+                else:
+                    self._filegen = FilePathGenerator()
+                    if not self._filegen.Preload(self._store_into):
+                        all_good = False
             else:
                 output.Error('A site needs a "store_into" attribute.')
                 all_good = False
@@ -1755,6 +1761,9 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
         if self._sitemaps > 1:
             self.WriteIndex()
 
+        # Save lastmod cache
+        json.dump(self._lastmod_dict, open(os.path.abspath("%s.cache" % self._store_into[:-4]), "w+"))
+
         # Notify
         self.NotifySearch()
 
@@ -1791,6 +1800,16 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
           url.loc, self._wildurl2):
             url.Log(prefix='IGNORED (output file)', level=2)
             return
+
+        if self._lastmod_dict is None:
+            if os.path.exists(os.path.abspath("%s.cache" % self._store_into[:-4])):
+                self._lastmod_dict = json.load(open(os.path.abspath("%s.cache" % self._store_into[:-4]), "r"))
+            else:
+                self._lastmod_dict = {}
+
+        if not url.loc in self._lastmod_dict or self._lastmod_dict[url.loc][0] != url.size:
+            self._lastmod_dict[url.loc] = [url.size, datetime.datetime.now().strftime("%s")]
+            url.lastmod = TimestampISO8601(int(datetime.datetime.now().strftime("%s")))
 
         # Note the sighting
         hash = url.MakeHash()

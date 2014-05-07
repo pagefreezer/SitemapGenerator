@@ -650,7 +650,7 @@ class Filter:#1
             self._wildcard = pattern
         elif type == 'regexp':
             try:
-                self._regexp = re.compile(pattern)
+                self._regexp = re.compile(pattern.lower())
             except re.error:
                 output.Error('Bad regular expression: %s' %  pattern)
 
@@ -666,12 +666,12 @@ class Filter:#1
             return None
 
         if self._wildcard:
-            if fnmatch.fnmatchcase(path_url, self._wildcard):
+            if fnmatch.fnmatchcase(path_url.lower(), self._wildcard.lower()):
                 return self._pass
             return None
 
         if self._regexp:
-            if self._regexp.search(path_url):
+            if self._regexp.search(path_url.lower()):
                 return self._pass
             return None
 

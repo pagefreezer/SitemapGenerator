@@ -762,7 +762,7 @@ class InputURLList:#1
 
             # Split the line on space
             url = URL()
-            cols = line.split(' ')
+            cols = line.split()
             for i in range(0,len(cols)):
                 cols[i] = cols[i].strip()
             url.TrySetAttribute('loc', cols[0])
@@ -972,7 +972,7 @@ class InputAccessLog:#1
         """ Recognize the Fields directive that heads an ELF file """
         if not line.startswith('#Fields:'):
             return False
-        fields = line.split(' ')
+        fields = line.split()
         del fields[0]
         for i in range(0, len(fields)):
             field = fields[i].strip()
@@ -993,7 +993,7 @@ class InputAccessLog:#1
 
     def GetELFLine(self, line):
         """ Fetch the requested URL from an ELF line """
-        fields = line.split(' ')
+        fields = line.split()
         count  = len(fields)
 
         size = 0

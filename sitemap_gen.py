@@ -385,7 +385,7 @@ output = Output()
 class URL(object):#1
     """ URL is a smart structure grouping together the properties we
     care about for a single web reference. """
-    __slots__ = 'loc', 'lastmod', 'changefreq', 'priority', "size"
+    __slots__ = 'loc', 'lastmod', 'changefreq', 'priority', "size", "timestamp"
 
     def __init__(self):
         self.loc        = None                  # URL -- in Narrow characters
@@ -952,6 +952,8 @@ class InputAccessLog:#1
         self._elf_urifrag1 = -1                 # ELF field: '/foo'
         self._elf_urifrag2 = -1                 # ELF field: 'bar=1'
         self._elf_bytes    = -1                 # ELF field: response bytes
+        self._elf_date     = -1                 # ELF field: date
+        self._elf_time     = -1                 # ELF field: time
 
         if not ValidateAttributes('ACCESSLOG', attributes, ('path', 'encoding')):
             return
@@ -988,6 +990,10 @@ class InputAccessLog:#1
                 self._elf_urifrag2 = i
             elif field == "sc-bytes":
                 self._elf_bytes = i
+            elif field == "date":
+                self._elf_date = i
+            elif field == "time":
+                self._elf_time = i
         output.Log('Recognized an Extended Log File Format file.', 2)
         return True
 
@@ -1016,18 +1022,30 @@ class InputAccessLog:#1
         if self._elf_bytes >= 0:
             size = fields[self._elf_bytes].strip()
 
+        # Get "date" as possible
+        if self._elf_date >= 0:
+            _date = fields[self._elf_date].strip()
+
+        # Get "time" as possible
+        if self._elf_time >= 0:
+            _time = fields[self._elf_time].strip()
+
+        timestamp = None
+        if _date and _time:
+            timestamp = datetime.datetime.strptime((_date + " " + _time).split(".")[0], "%Y-%m-%d %H:%M:%S").strftime("%s")
+
         # Pull the full URL if we can
         if self._elf_uri >= 0:
             if self._elf_uri >= count:
                 return (None, size)
             url = fields[self._elf_uri].strip()
             if url != '-':
-                return (url, size)
+                return (url, size, timestamp)
 
         # Put together a fragmentary URL
         if self._elf_urifrag1 >= 0:
             if self._elf_urifrag1 >= count or self._elf_urifrag2 >= count:
-                return (url, size)
+                return (url, size, timestamp)
             urlfrag1 = fields[self._elf_urifrag1].strip()
             urlfrag2 = None
             if self._elf_urifrag2 >= 0:
@@ -1035,7 +1053,7 @@ class InputAccessLog:#1
             if urlfrag1 and (urlfrag1 != '-'):
                 if urlfrag2 and (urlfrag2 != '-'):
                     urlfrag1 = urlfrag1 + '?' + urlfrag2
-                return (urlfrag1, size)
+                return (urlfrag1, size, timestamp)
 
         return (None, size)
 
@@ -1092,9 +1110,14 @@ class InputAccessLog:#1
                 self._is_clf = self.RecognizeCLFLine(line)
 
             # Digest the line
+            timestamp = None
             match = None
             if self._is_elf:
-                match, size = self.GetELFLine(line)
+                pieces = self.GetELFLine(line)
+                if len(pieces) > 2:
+                    match, size, timestamp = pieces
+                else:
+                    match, size = pieces
             elif self._is_clf:
                 match, size = self.GetCLFLine(line)
             if not match:
@@ -1104,6 +1127,8 @@ class InputAccessLog:#1
             url = URL()
             url.TrySetAttribute('loc', match)
             url.TrySetAttribute("size", size)
+            if timestamp:
+                url.TrySetAttribute("timestamp", timestamp)
             consumer(url, True)
 
         file.close()
@@ -1802,14 +1827,22 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
             return
 
         if self._lastmod_dict is None:
-            if os.path.exists(os.path.abspath("%s.cache" % self._store_into[:-4])):
+            try:
                 self._lastmod_dict = json.load(open(os.path.abspath("%s.cache" % self._store_into[:-4]), "r"))
-            else:
+            except:
                 self._lastmod_dict = {}
 
-        if not url.loc in self._lastmod_dict or self._lastmod_dict[url.loc][0] != url.size:
-            self._lastmod_dict[url.loc] = [url.size, datetime.datetime.now().strftime("%s")]
-            url.lastmod = TimestampISO8601(int(datetime.datetime.now().strftime("%s")))
+        timestamp = getattr(url, "timestamp", None)
+        if not timestamp:
+            timestamp = datetime.datetime.now().strftime("%s")
+
+        if not url.loc in self._lastmod_dict:
+            self._lastmod_dict[url.loc] = [url.size, timestamp]
+
+        if self._lastmod_dict[url.loc][0] != url.size:
+            self._lastmod_dict[url.loc] = [url.size, timestamp]
+
+        url.lastmod = TimestampISO8601(int(self._lastmod_dict[url.loc][1]))
 
         # Note the sighting
         hash = url.MakeHash()

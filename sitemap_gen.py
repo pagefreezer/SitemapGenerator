@@ -113,6 +113,11 @@ NOTIFICATION_SITES = [
 # endfold
 
 
+def to_timestamp(dt):
+    """ Convert datetime object to unixtime string """
+    return "%0.f" % (dt - datetime.datetime(1970,1,1)).total_seconds()
+
+
 class Error(Exception):#1
     """
     Base exception class.  In this module we tend not to use our own exception
@@ -1032,7 +1037,7 @@ class InputAccessLog:#1
 
         timestamp = None
         if _date and _time:
-            timestamp = datetime.datetime.strptime((_date + " " + _time).split(".")[0], "%Y-%m-%d %H:%M:%S").strftime("%s")
+            timestamp = to_timestamp(datetime.datetime.strptime((_date + " " + _time).split(".")[0], "%Y-%m-%d %H:%M:%S"))
 
         # Pull the full URL if we can
         if self._elf_uri >= 0:
@@ -1834,7 +1839,7 @@ class Sitemap(xml.sax.handler.ContentHandler):#1
 
         timestamp = getattr(url, "timestamp", None)
         if not timestamp:
-            timestamp = datetime.datetime.now().strftime("%s")
+            timestamp = to_timestamp(datetime.datetime.now())
 
         if not url.loc in self._lastmod_dict:
             self._lastmod_dict[url.loc] = [url.size, timestamp]
